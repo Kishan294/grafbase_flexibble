@@ -2,21 +2,22 @@ import { getServerSession } from "next-auth/next";
 import { NextAuthOptions, User } from "next-auth";
 import { AdapterUser } from "next-auth/adapters";
 import GoogleProvider from "next-auth/providers/google";
-import jsowebtoken from "jsonwebtoken";
+import jsonwebtoken from 'jsonwebtoken'
 import { JWT } from "next-auth/jwt";
-import { SessionInterface, UserProfile } from "@/common.types";
+
 import { createUser, getUser } from "./actions";
+import { SessionInterface, UserProfile } from "@/common.types";
 
 export const authOptions: NextAuthOptions = {
   providers: [
     GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID as string,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
+      clientId: process.env.GOOGLE_CLIENT_ID!,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
     }),
   ],
   jwt: {
     encode: ({ secret, token }) => {
-      const encodedToken = jsowebtoken.sign(
+      const encodedToken = jsonwebtoken.sign(
         {
           ...token,
           iss: "grafbase",
@@ -24,22 +25,25 @@ export const authOptions: NextAuthOptions = {
         },
         secret
       );
+      
       return encodedToken;
     },
     decode: async ({ secret, token }) => {
-      const decodedToken = jsowebtoken.verify(token!, secret) as JWT;
-      return decodedToken;
+      const decodedToken = jsonwebtoken.verify(token!, secret);
+      return decodedToken as JWT;
     },
   },
   theme: {
     colorScheme: "light",
-    logo: "/logo.png",
+    logo: "/logo.svg",
   },
   callbacks: {
     async session({ session }) {
       const email = session?.user?.email as string;
-      try {
-        const data = (await getUser(email)) as { user?: UserProfile };
+
+      try { 
+        const data = await getUser(email) as { user?: UserProfile }
+
         const newSession = {
           ...session,
           user: {
@@ -47,29 +51,26 @@ export const authOptions: NextAuthOptions = {
             ...data?.user,
           },
         };
+
         return newSession;
-      } catch (error) {
-        console.log("Error retrieving user data", error);
+      } catch (error: any) {
+        console.error("Error retrieving user data: ", error.message);
         return session;
       }
     },
-    async signIn({ user }: { user: AdapterUser | User }) {
+    async signIn({ user }: {
+      user: AdapterUser | User
+    }) {
       try {
-        // get the user if they exist
-        const userExists = (await getUser(user?.email as string)) as {
-          user?: UserProfile;
-        };
-
+        const userExists = await getUser(user?.email as string) as { user?: UserProfile }
+        
         if (!userExists.user) {
-          await createUser(
-            user.name as string,
-            user.email as string,
-            user.image as string
-          );
+          await createUser(user.name as string, user.email as string, user.image as string)
         }
+
         return true;
-      } catch (error) {
-        console.log(error);
+      } catch (error: any) {
+        console.log("Error checking if user exists: ", error.message);
         return false;
       }
     },
@@ -77,7 +78,7 @@ export const authOptions: NextAuthOptions = {
 };
 
 export async function getCurrentUser() {
-  const session = (await getServerSession(authOptions)) as SessionInterface;
+  const session = await getServerSession(authOptions) as SessionInterface;
 
   return session;
 }
